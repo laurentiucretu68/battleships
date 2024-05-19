@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 node_modules/
 .expo/
 dist/
@@ -144,4 +143,6 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
->>>>>>> 52367e953405f270e38ebde75b2309faf677e1f3
+
+.idea
+package-lock.json

@@ -1,90 +1,135 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity, Dimensions, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert, ScrollView, Image, TextInput } from 'react-native';
 import agent from '../util';
+import { debounce } from 'lodash';
 
 const { width } = Dimensions.get('window');
 
 export default function GameScreen({ route, navigation }) {
     const { gameId } = route.params;
     const [gameDetails, setGameDetails] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [selectedCells, setSelectedCells] = useState([]);
     const [ships, setShips] = useState([]);
-    const [isStrikeMode, setIsStrikeMode] = useState(false);
+    const [playerType, setPlayerType] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [selectedPlane, setSelectedPlane] = useState(null);
+    const [planePosition, setPlanePosition] = useState({ x: 'A', y: 1, vertical: false });
+    const [shipCounts, setShipCounts] = useState({ '2': 4, '3': 3, '4': 2, '6': 1 });
+    const [isSubmitEnabled, setIsSubmitEnabled] = useState(false);
 
     useEffect(() => {
-        fetchGameDetails(gameId);
+        fetchGameDetails(gameId, true);
+        const debouncedFetch = debounce(() => fetchGameDetails(gameId, false), 2000);
+        const intervalId = setInterval(debouncedFetch, 2000);
+        return () => {
+            clearInterval(intervalId);
+            debouncedFetch.cancel();
+        };
     }, [gameId]);
 
-    const fetchGameDetails = (id) => {
-        setIsLoading(true);
+    useEffect(() => {
+        checkAllShipsPlaced();
+    }, [shipCounts]);
+
+    const fetchGameDetails = (id, showLoading = true) => {
         agent.Game.getGameDetails(id)
             .then(response => {
+                console.log(response);
                 setGameDetails(response);
-                setIsLoading(false);
+                setPlayerType(response.player1.id === response.playerToMoveId ? 'player1' : 'player2');
+                if (showLoading) setIsLoading(false);
             })
             .catch(error => {
-                setIsLoading(false);
-                console.error(error);
+                if (showLoading) setIsLoading(false);
+                console.error(error.response.data.message);
             });
     };
 
-    const handleCellPress = (row, col) => {
-        const cell = { x: String.fromCharCode(65 + row), y: col + 1 };
-        if (isStrikeMode) {
-            handleSendStrike(cell);
+    const sendMapConfiguration = async (shipsConfig) => {
+        try {
+            await agent.Game.sendMapConfiguration(gameId, { ships: shipsConfig });
+            Alert.alert('Success', 'Map configuration sent successfully');
+        } catch (error) {
+            console.error(error.response.data.message);
+            Alert.alert('Error', error.response.data.message);
+        }
+    };
+
+    const checkCollision = (newShip, existingShips) => {
+        const newShipPositions = [];
+        if (newShip.direction === 'HORIZONTAL') {
+            for (let i = 0; i < newShip.size; i++) {
+                newShipPositions.push({ x: newShip.x, y: newShip.y + i });
+            }
         } else {
-            setSelectedCells((prevSelectedCells) => {
-                // Adaugă sau elimină celula din lista de celule selectate
-                const cellExists = prevSelectedCells.some(
-                    (selectedCell) => selectedCell.x === cell.x && selectedCell.y === cell.y
-                );
-                if (cellExists) {
-                    return prevSelectedCells.filter(
-                        (selectedCell) => selectedCell.x !== cell.x || selectedCell.y !== cell.y
-                    );
-                } else {
-                    return [...prevSelectedCells, cell];
+            for (let i = 0; i < newShip.size; i++) {
+                newShipPositions.push({ x: String.fromCharCode(newShip.x.charCodeAt(0) + i), y: newShip.y });
+            }
+        }
+
+        for (let ship of existingShips) {
+            const shipPositions = [];
+            if (ship.direction === 'HORIZONTAL') {
+                for (let i = 0; i < ship.size; i++) {
+                    shipPositions.push({ x: ship.x, y: ship.y + i });
                 }
+            } else {
+                for (let i = 0; i < ship.size; i++) {
+                    shipPositions.push({ x: String.fromCharCode(ship.x.charCodeAt(0) + i), y: ship.y });
+                }
+            }
+            for (let pos of newShipPositions) {
+                if (shipPositions.some(sp => sp.x === pos.x && sp.y === pos.y)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    const handlePlacePlane = () => {
+        if (!gameDetails.player2) {
+            Alert.alert('Waiting', 'You cannot place ships until the second player joins.');
+            return;
+        }
+
+        if (selectedPlane && planePosition) {
+            const newShip = {
+                x: planePosition.x,
+                y: planePosition.y,
+                size: selectedPlane === 'plane1' ? 2 : selectedPlane === 'plane2' ? 3 : selectedPlane === 'plane3' ? 4 : 6,
+                direction: planePosition.vertical ? 'VERTICAL' : 'HORIZONTAL'
+            };
+
+            if (checkCollision(newShip, ships)) {
+                Alert.alert('Error', 'Invalid configuration, the new ship intersects with another ship.');
+                return;
+            }
+
+            setShips((prevShips) => {
+                const updatedShips = [...prevShips, newShip];
+                updateShipCount(newShip.size.toString());
+                return updatedShips;
             });
+            setSelectedPlane(null);
+            setPlanePosition({ x: 'A', y: 1, vertical: false });
         }
     };
 
-    const handlePlaceShip = () => {
-        if (selectedCells.length > 0) {
-            const newShips = selectedCells.map((cell) => ({
-                ...cell,
-                size: 2,
-                direction: 'HORIZONTAL',
-            }));
-            setShips((prevShips) => [...prevShips, ...newShips]);
-            setSelectedCells([]);
-        }
+    const updateShipCount = (size) => {
+        setShipCounts(prevCounts => {
+            const updatedCounts = { ...prevCounts };
+            updatedCounts[size] -= 1;
+            return updatedCounts;
+        });
     };
 
-    const handleSendConfiguration = () => {
-        console.log({ ships })
-        agent.Game.sendMapConfiguration(gameId, { ships })
-            .then(response => {
-                Alert.alert('Success', 'Configuration sent successfully');
-            })
-            .catch(error => {
-                console.log(error)
-                Alert.alert('Error', 'Failed to send configuration');
-                console.error(error);
-            });
+    const checkAllShipsPlaced = () => {
+        const allShipsPlaced = Object.values(shipCounts).every(count => count === 0);
+        setIsSubmitEnabled(allShipsPlaced);
     };
 
-    const handleSendStrike = (cell) => {
-        agent.Game.sendStrike(gameId, cell)
-            .then(response => {
-                Alert.alert('Success', 'Strike sent successfully');
-                fetchGameDetails(gameId);
-            })
-            .catch(error => {
-                Alert.alert('Error', 'Failed to send strike');
-                console.error(error);
-            });
+    const handlePlaneSelect = (planeType) => {
+        setSelectedPlane(planeType);
     };
 
     const renderGrid = () => {
@@ -93,24 +138,23 @@ export default function GameScreen({ route, navigation }) {
             const row = [];
             for (let j = 0; j < 10; j++) {
                 const cell = { x: String.fromCharCode(65 + i), y: j + 1 };
-                const isSelected = selectedCells.some(
-                    (selectedCell) => selectedCell.x === cell.x && selectedCell.y === cell.y
-                );
-                const isShip = ships.some(
-                    (ship) => ship.x === cell.x && ship.y === cell.y
-                );
+                const ship = ships.find(ship => {
+                    if (ship.direction === 'HORIZONTAL') {
+                        return ship.x === cell.x && ship.y <= cell.y && cell.y < ship.y + ship.size;
+                    } else {
+                        return ship.y === cell.y && ship.x.charCodeAt(0) <= cell.x.charCodeAt(0) && cell.x.charCodeAt(0) < ship.x.charCodeAt(0) + ship.size;
+                    }
+                });
                 row.push(
-                    <TouchableOpacity
+                    <View
                         key={`${i}-${j}`}
                         style={[
                             styles.cell,
-                            isSelected && styles.selectedCell,
-                            isShip && styles.shipCell,
+                            ship && (ship.size === 2 ? styles.plane1Cell : ship.size === 3 ? styles.plane2Cell : ship.size === 4 ? styles.plane3Cell : styles.plane4Cell),
                         ]}
-                        onPress={() => handleCellPress(i, j)}
                     >
                         <Text style={styles.cellText}>{String.fromCharCode(65 + i)}{j + 1}</Text>
-                    </TouchableOpacity>
+                    </View>
                 );
             }
             grid.push(<View key={i} style={styles.row}>{row}</View>);
@@ -118,41 +162,93 @@ export default function GameScreen({ route, navigation }) {
         return grid;
     };
 
-    if (isLoading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#0000ff" />
-            </View>
-        );
-    }
+    const handleSubmit = () => {
+        sendMapConfiguration(ships);
+    };
 
     return (
         <ScrollView contentContainerStyle={styles.scrollContainer}>
             <View style={styles.container}>
-                <View style={[styles.gridContainer, { marginTop: 40 }]}>
-                    {renderGrid()}
-                </View>
-                <View style={[styles.actionsContainer]}>
-                    <TouchableOpacity style={styles.actionButton} onPress={handlePlaceShip}>
-                        <Text style={styles.actionButtonText}>Place Ships</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionButton} onPress={handleSendConfiguration}>
-                        <Text style={styles.actionButtonText}>Send Configuration</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionButton} onPress={() => setIsStrikeMode(true)}>
-                        <Text style={styles.actionButtonText}>Start Strike</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                        <Text style={styles.backButtonText}>Back to Games</Text>
-                    </TouchableOpacity>
-                </View>
-                <View style={[styles.detailsContainer]}>
-                    <Text style={styles.detailText}>Game ID: {gameDetails.id}</Text>
-                    <Text style={styles.detailText}>Status: {gameDetails.status}</Text>
-                    <Text style={styles.detailText}>Player 1: {gameDetails.player1?.email}</Text>
-                    <Text style={styles.detailText}>Player 2: {gameDetails.player2 ? gameDetails.player2.email : 'Waiting for player'}</Text>
-                    <Text style={styles.detailText}>Player to Move: {gameDetails.playerToMoveId === gameDetails.player1Id ? gameDetails.player1?.email : gameDetails.player2?.email || 'N/A'}</Text>
-                </View>
+                {isLoading ? (
+                    <View style={styles.loadingContainer}>
+                        <Text>Loading...</Text>
+                    </View>
+                ) : (
+                    <>
+                        <View style={[styles.gridContainer, { marginTop: 40 }]}>
+                            {renderGrid()}
+                        </View>
+                        <View style={styles.planesContainer}>
+                            <TouchableOpacity onPress={() => handlePlaneSelect('plane1')} style={styles.planeButton}>
+                                <Image source={require('../assets/images/plane1.webp')} style={styles.planeImage} />
+                                <Text style={styles.planeText}>2</Text>
+                                <View style={styles.plane1Color}></View>
+                                <Text>{shipCounts['2']} left</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handlePlaneSelect('plane2')} style={styles.planeButton}>
+                                <Image source={require('../assets/images/plane2.webp')} style={styles.planeImage} />
+                                <Text style={styles.planeText}>3</Text>
+                                <View style={styles.plane2Color}></View>
+                                <Text>{shipCounts['3']} left</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handlePlaneSelect('plane3')} style={styles.planeButton}>
+                                <Image source={require('../assets/images/plane3.png')} style={styles.planeImage} />
+                                <Text style={styles.planeText}>4</Text>
+                                <View style={styles.plane3Color}></View>
+                                <Text>{shipCounts['4']} left</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handlePlaneSelect('plane4')} style={styles.planeButton}>
+                                <Image source={require('../assets/images/plane4.png')} style={styles.planeImage} />
+                                <Text style={styles.planeText}>6</Text>
+                                <View style={styles.plane4Color}></View>
+                                <Text>{shipCounts['6']} left</Text>
+                            </TouchableOpacity>
+                        </View>
+                        {selectedPlane && (
+                            <View style={styles.planePlacementContainer}>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="X"
+                                    value={planePosition.x}
+                                    onChangeText={(text) => setPlanePosition({ ...planePosition, x: text.toUpperCase() })}
+                                />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Y"
+                                    keyboardType="numeric"
+                                    value={planePosition.y.toString()}
+                                    onChangeText={(text) => setPlanePosition({ ...planePosition, y: parseInt(text) })}
+                                />
+                                <TouchableOpacity
+                                    style={styles.verticalToggle}
+                                    onPress={() => setPlanePosition({ ...planePosition, vertical: !planePosition.vertical })}
+                                >
+                                    <Text>{planePosition.vertical ? 'Horizontal' : 'Vertical'}</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.placeButton} onPress={handlePlacePlane}>
+                                    <Text style={styles.placeButtonText}>Place</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                        <View style={styles.actionsContainer}>
+                            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+                                <Text style={styles.backButtonText}>Back to Games</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.submitButton, { backgroundColor: isSubmitEnabled ? '#007bff' : '#ccc' }]} onPress={handleSubmit} disabled={!isSubmitEnabled}>
+                                <Text style={styles.submitButtonText}>Submit</Text>
+                            </TouchableOpacity>
+                        </View>
+                        {gameDetails && (
+                            <View style={styles.detailsContainer}>
+                                <Text style={styles.detailText}>Game ID: {gameDetails.id}</Text>
+                                <Text style={styles.detailText}>Status: {gameDetails.status}</Text>
+                                <Text style={styles.detailText}>Player 1: {gameDetails.player1?.email}</Text>
+                                <Text style={styles.detailText}>Player 2: {gameDetails.player2 ? gameDetails.player2.email : 'Waiting for player'}</Text>
+                                <Text style={styles.detailText}>Player to Move: {gameDetails.playerToMoveId === gameDetails.player1Id ? gameDetails.player1?.email : gameDetails.player2?.email || 'N/A'}</Text>
+                            </View>
+                        )}
+                    </>
+                )}
             </View>
         </ScrollView>
     );
@@ -187,6 +283,81 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 20,
     },
+    planesContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+        marginBottom: 20,
+        paddingHorizontal: 10,
+    },
+    planeButton: {
+        alignItems: 'center',
+        marginHorizontal: 10,
+    },
+    planeImage: {
+        width: 50,
+        height: 50,
+    },
+    planeText: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginHorizontal: 10,
+    },
+    plane1Color: {
+        width: 20,
+        height: 20,
+        backgroundColor: '#007bff',
+        marginTop: 5,
+    },
+    plane2Color: {
+        width: 20,
+        height: 20,
+        backgroundColor: '#28a745',
+        marginTop: 5,
+    },
+    plane3Color: {
+        width: 20,
+        height: 20,
+        backgroundColor: '#6f42c1',
+        marginTop: 5,
+    },
+    plane4Color: {
+        width: 20,
+        height: 20,
+        backgroundColor: '#ff6347',
+        marginTop: 5,
+    },
+    planePlacementContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    input: {
+        borderWidth: 1,
+        borderColor: '#ccc',
+        padding: 10,
+        borderRadius: 5,
+        marginHorizontal: 5,
+        width: 50,
+        textAlign: 'center',
+    },
+    verticalToggle: {
+        padding: 10,
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 5,
+        marginHorizontal: 5,
+    },
+    placeButton: {
+        backgroundColor: '#28a745',
+        padding: 10,
+        borderRadius: 5,
+        marginHorizontal: 5,
+    },
+    placeButtonText: {
+        color: '#fff',
+        fontWeight: 'bold',
+    },
     row: {
         flexDirection: 'row',
     },
@@ -199,11 +370,17 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    selectedCell: {
-        backgroundColor: '#a5d6a7',
+    plane1Cell: {
+        backgroundColor: '#007bff',
     },
-    shipCell: {
-        backgroundColor: '#1e88e5',
+    plane2Cell: {
+        backgroundColor: '#28a745',
+    },
+    plane3Cell: {
+        backgroundColor: '#6f42c1',
+    },
+    plane4Cell: {
+        backgroundColor: '#ff6347',
     },
     cellText: {
         fontSize: 12,
@@ -213,19 +390,6 @@ const styles = StyleSheet.create({
         width: width * 0.9,
         marginBottom: 20,
     },
-    actionButton: {
-        backgroundColor: '#28a745',
-        borderRadius: 10,
-        padding: 15,
-        marginTop: 10,
-        alignItems: 'center',
-    },
-    actionButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
-        textAlign: 'center',
-    },
     backButton: {
         backgroundColor: '#007bff',
         borderRadius: 10,
@@ -234,6 +398,19 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     backButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+        textAlign: 'center',
+    },
+    submitButton: {
+        backgroundColor: '#007bff',
+        borderRadius: 10,
+        padding: 15,
+        marginTop: 10,
+        alignItems: 'center',
+    },
+    submitButtonText: {
         color: '#fff',
         fontSize: 16,
         fontWeight: 'bold',

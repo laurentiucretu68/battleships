@@ -12,7 +12,7 @@ function MainMenu() {
 
     const handleLogout = async () => {
         try {
-            await logout(); // Use the logout function from AuthContext
+            await logout();
         } catch (error) {
             Alert.alert("Logout Failed", "An error occurred while trying to log out.");
         }
@@ -67,7 +67,6 @@ function MainMenu() {
                 ),
             }} listeners={{
                 focus: async () => {
-                    // Execute logout when this drawer item is focused
                     await handleLogout()
                 },
             }}/>

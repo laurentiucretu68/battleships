@@ -4,7 +4,19 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="7cb77ba7-d8c6-4158-ac5d-4e17f50c4ed3" name="Changes" comment="" />
+    <list default="true" id="7cb77ba7-d8c6-4158-ac5d-4e17f50c4ed3" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/screens/GameScreen.js" beforeDir="false" afterPath="$PROJECT_DIR$/screens/GameScreen.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/screens/HomeScreen.js" beforeDir="false" afterPath="$PROJECT_DIR$/screens/HomeScreen.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/screens/MainMenu.js" beforeDir="false" afterPath="$PROJECT_DIR$/screens/MainMenu.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/screens/PlayScreen.js" beforeDir="false" afterPath="$PROJECT_DIR$/screens/PlayScreen.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/util/AuthNavigation.js" beforeDir="false" afterPath="$PROJECT_DIR$/util/AuthNavigation.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/util/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/util/index.js" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -40,23 +52,25 @@
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
     &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/Users/lcretu/Desktop/Facultate/Anul 4/Semestrul 2/React Native/battleships&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/lcretu/Desktop/Facultate/Anul 4/Semestrul 2/React Native/battleships/assets/doc&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
     &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
     &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.lookFeel&quot;,
-    &quot;ts.external.directory.path&quot;: &quot;/Applications/WebStorm.app/Contents/plugins/javascript-impl/jsLanguageServicesImpl/external&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;dev.gabrielchl.intellijpets.settings.AppSettingsConfigurable&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;/Applications/WebStorm.app/Contents/plugins/javascript-plugin/jsLanguageServicesImpl/external&quot;,
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
 }</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/assets/doc" />
       <recent name="$PROJECT_DIR$" />
       <recent name="$PROJECT_DIR$/assets" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/assets/doc" />
       <recent name="$PROJECT_DIR$" />
     </key>
   </component>
@@ -81,7 +95,7 @@
       <workItem from="1712120050416" duration="825000" />
       <workItem from="1712171059179" duration="11775000" />
       <workItem from="1715662631185" duration="97000" />
-      <workItem from="1715662768674" duration="24100000" />
+      <workItem from="1715662768674" duration="80764000" />
     </task>
     <servers />
   </component>

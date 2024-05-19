@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity, FlatList, Modal, Dimensions } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity, FlatList, Modal, Dimensions, Alert, TextInput } from 'react-native';
 import { BlurView } from 'expo-blur';
 import agent from '../util';
 import LoginScreen from "./LoginScreen";
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 
@@ -16,6 +16,8 @@ export default function PlayScreen() {
     const [isFetchingMore, setIsFetchingMore] = useState(false);
     const [selectedGame, setSelectedGame] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
+    const [createGameModalVisible, setCreateGameModalVisible] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
     const navigation = useNavigation();
 
     useEffect(() => {
@@ -23,12 +25,18 @@ export default function PlayScreen() {
             .then(response => {
                 setUserDetails(response.user);
                 setIsLoading(false);
-                fetchGames(1, 10); // Fetch initial 10 games
+                fetchGames(1, 10);
             })
             .catch(error => {
                 setIsLoading(false);
             });
     }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchGames(1, 10);
+        }, [])
+    );
 
     const fetchGames = (page, limit) => {
         setIsFetchingMore(true);
@@ -53,10 +61,13 @@ export default function PlayScreen() {
         agent.Game.createGame()
             .then(response => {
                 setIsCreatingGame(false);
-                fetchGames(1, 10); // Reset and fetch initial 10 games
+                setCreateGameModalVisible(false);
+                setGames(prevGames => [response, ...prevGames.filter(game => game.player2Id === null)]);
+                navigation.navigate('GameScreen', { gameId: response.id });
             })
             .catch(error => {
                 setIsCreatingGame(false);
+                Alert.alert('Error', `Failed to create game ${error.response.data.message}`);
                 console.error(error);
             });
     };
@@ -65,7 +76,7 @@ export default function PlayScreen() {
         if (!isFetchingMore) {
             const nextPage = page + 1;
             setPage(nextPage);
-            fetchGames(nextPage, 10); // Load next 10 games
+            fetchGames(nextPage, 10);
         }
     };
 
@@ -75,9 +86,30 @@ export default function PlayScreen() {
     };
 
     const joinGame = (game) => {
-        setModalVisible(false);
-        navigation.navigate('GameScreen', { gameId: game.id });
+        if (game.player1?.id === userDetails.id) {
+            setModalVisible(false);
+            navigation.navigate('GameScreen', { gameId: game.id });
+        } else {
+            agent.Game.joinGame(game.id)
+                .then(response => {
+                    setModalVisible(false);
+                    navigation.navigate('GameScreen', { gameId: game.id });
+                })
+                .catch(error => {
+                    Alert.alert('Error', `Failed to join game: ${error.response.data.message}`);
+                });
+        }
     };
+
+    const handleSearch = (text) => {
+        setSearchTerm(text.toLowerCase());
+    };
+
+    const filteredGames = games.filter(game => {
+        const player1Email = game.player1?.email.toLowerCase() || '';
+        const player2Email = game.player2?.email.toLowerCase() || '';
+        return player1Email.includes(searchTerm) || player2Email.includes(searchTerm);
+    });
 
     if (isLoading) {
         return (
@@ -97,21 +129,29 @@ export default function PlayScreen() {
                     <FlatList
                         ListHeaderComponent={
                             <>
-                                <TouchableOpacity style={styles.createButton} onPress={createGame} disabled={isCreatingGame}>
+                                <TouchableOpacity style={styles.createButton} onPress={() => setCreateGameModalVisible(true)} disabled={isCreatingGame}>
                                     <Text style={styles.createButtonText}>Create New Game</Text>
                                 </TouchableOpacity>
                                 <Text style={styles.title}>Available Games</Text>
+                                <TextInput
+                                    style={styles.searchBox}
+                                    placeholder="Search by player email"
+                                    value={searchTerm}
+                                    onChangeText={handleSearch}
+                                />
                             </>
                         }
-                        data={games}
-                        keyExtractor={item => item.id}
+                        data={filteredGames}
+                        keyExtractor={item => item?.id ?? Math.random().toString()}
                         renderItem={({ item }) => (
-                            <TouchableOpacity style={styles.gameItem} onPress={() => selectGame(item)}>
-                                <Text style={styles.gameId}>Game ID: {item.id}</Text>
-                                <Text style={styles.gameStatus}>Status: {item.status}</Text>
-                                <Text style={styles.playerInfo}>Player 1: {item.player1?.email}</Text>
-                                <Text style={styles.playerInfo}>Player 2: Waiting for player</Text>
-                            </TouchableOpacity>
+                            item ? (
+                                <TouchableOpacity style={styles.gameItem} onPress={() => selectGame(item)}>
+                                    <Text style={styles.gameId}>Game ID: {item.id}</Text>
+                                    <Text style={styles.gameStatus}>Status: {item.status}</Text>
+                                    <Text style={styles.playerInfo}>Player 1: {item.player1?.email}</Text>
+                                    <Text style={styles.playerInfo}>Player 2: Waiting for player</Text>
+                                </TouchableOpacity>
+                            ) : null
                         )}
                         contentContainerStyle={styles.contentContainer}
                         ListFooterComponent={
@@ -158,6 +198,33 @@ export default function PlayScreen() {
                             </View>
                         </Modal>
                     )}
+                    <Modal
+                        animationType="slide"
+                        transparent={true}
+                        visible={createGameModalVisible}
+                        onRequestClose={() => setCreateGameModalVisible(false)}
+                    >
+                        <View style={styles.centeredView}>
+                            <View style={styles.modalView}>
+                                <Text style={styles.modalTitle}>Create New Game</Text>
+                                <View style={styles.modalButtons}>
+                                    <TouchableOpacity
+                                        style={styles.createButtonModal}
+                                        onPress={createGame}
+                                        disabled={isCreatingGame}
+                                    >
+                                        <Text style={styles.textStyle}>Create</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.closeButton}
+                                        onPress={() => setCreateGameModalVisible(false)}
+                                    >
+                                        <Text style={styles.textStyle}>Cancel</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+                    </Modal>
                 </>
             ) : (
                 <LoginScreen />
@@ -185,8 +252,9 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         padding: 15,
         marginVertical: 10,
-        width: width * 0.9, // Setează lățimea butonului
+        width: width * 0.9,
         alignSelf: 'center',
+        alignItems: 'center',
     },
     createButtonText: {
         color: '#fff',
@@ -201,8 +269,18 @@ const styles = StyleSheet.create({
         color: '#343a40',
         alignSelf: 'center',
     },
+    searchBox: {
+        backgroundColor: '#fff',
+        padding: 10,
+        borderRadius: 10,
+        borderColor: '#ddd',
+        borderWidth: 1,
+        width: width * 0.9,
+        marginBottom: 20,
+        alignSelf: 'center',
+    },
     gameItem: {
-        width: width * 0.9, // Setează lățimea cardului
+        width: width * 0.9,
         padding: 20,
         backgroundColor: '#fff',
         borderRadius: 10,
@@ -249,7 +327,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.25,
         shadowRadius: 4,
         elevation: 5,
-        width: width * 0.9, // Setează lățimea modalului
+        width: width * 0.9,
     },
     modalTitle: {
         fontSize: 24,
@@ -267,12 +345,23 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         marginTop: 20,
     },
+    createButtonModal: {
+        backgroundColor: '#007bff',
+        borderRadius: 10,
+        padding: 10,
+        elevation: 2,
+        marginHorizontal: 5,
+        alignItems: 'center',
+        width: 100,
+    },
     closeButton: {
         backgroundColor: '#dc3545',
         borderRadius: 10,
         padding: 10,
         elevation: 2,
         marginHorizontal: 5,
+        alignItems: 'center',
+        width: 100,
     },
     joinButton: {
         backgroundColor: '#28a745',
@@ -280,6 +369,8 @@ const styles = StyleSheet.create({
         padding: 10,
         elevation: 2,
         marginHorizontal: 5,
+        alignItems: 'center',
+        width: 100,
     },
     textStyle: {
         color: 'white',

@@ -18,7 +18,7 @@ const AuthNavigation = () => {
             <Stack.Navigator screenOptions={{headerShown: false}}>
                 {isLogged ? (
                     <>
-                        <Stack.Screen name="Home" component={MainMenu}/>
+                        <Stack.Screen name="MainMenu" component={MainMenu}/>
                         <Stack.Screen name="Play" component={PlayScreen}/>
                         <Stack.Screen name="GameScreen" component={GameScreen}/>
                     </>
